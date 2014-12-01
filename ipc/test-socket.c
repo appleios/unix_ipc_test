@@ -12,7 +12,7 @@
 #include <time.h>
 
 #define LISTEN_BACKLOG 10
-#define DEBUG
+#define xDEBUG
 
 typedef enum {
 	TCP,
@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
 				return 31;
 			}
 			
-			if (op == TCP) {
+			if (op == TCP) { /* tcp */
 				if (listen(sockid, LISTEN_BACKLOG) == -1){
 					close(sockid);
 					fprintf(stderr,"Error: faild to listen socket port %d.\n",port);
@@ -152,12 +152,15 @@ int main(int argc, char *argv[])
 				}
 				
 				send(cfd,&secret,sizeof(secret),0);
-			}else{
-				printf("sendto %d\n",sockid);
-				if(sendto(sockid,&secret,sizeof(secret),0,
-					   (struct sockaddr*)&sock_addr,sizeof(struct sockaddr_in)) <0 ){
-					printf("sendto failed\n");
-				}
+			}else{ /* udp */
+				
+				recv_sz = (int) sizeof(struct sockaddr_in);
+				recvfrom(sockid, &p, sizeof(p), 0,
+						 (struct sockaddr *) &sock_addr_recv, &recv_sz);
+				
+				sendto(sockid, &secret, sizeof(secret), 0,
+					   (struct sockaddr*)&sock_addr_recv, recv_sz);
+				
 			}
 			
 		}else if(op == NATIVE){
@@ -209,16 +212,16 @@ int main(int argc, char *argv[])
 				recv(sockid,&secret,sizeof(secret),0);
 			}else{
 				
-				recv_sz = (int) sizeof(struct sockaddr_in);
-				
-				recvfrom(sockid,&secret,sizeof(secret),0,
-						 (struct sockaddr *) &sock_addr,&recv_sz);
-				
-				if (recv_sz == 0) {
-					printf("!");
-				}else if(recv_sz == -1){
-					printf("**");
+				if(sendto(sockid,&p,sizeof(p),0,
+					   (struct sockaddr*)&sock_addr,sizeof(struct sockaddr_in)) <0 ){
+					printf("sendto failed\n");
 				}
+
+				
+				recv_sz = (int)sizeof(struct sockaddr_in);
+				recvfrom(sockid, &secret, sizeof(secret), 0,
+						 (struct sockaddr *)&sock_addr, &recv_sz);
+				
 			}
 		}else{
 			t = connect(sockid,(struct sockaddr *) &my_addr,sizeof(struct sockaddr_un));

@@ -10,3 +10,4 @@ programs include
 * test-socket (AF_UNIX, TCP and UDP)
 * test-msgq (!not done yet)
 
+to understand the difference - run with `strace`
