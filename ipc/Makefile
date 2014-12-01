@@ -1,4 +1,4 @@
-all: test-fork	test-pipe test-fifo test-signal test-shmem
+all: test-fork	test-pipe test-fifo test-signal test-shmem test-socket
 
 test-fork: test-fork.c
 	gcc -ansi -Wall -pedantic test-fork.c -o bin/test-fork
@@ -15,3 +15,7 @@ test-signal: test-signal.c
 
 test-shmem: test-shmem.c
 	gcc -ansi -Wall -pedantic test-shmem.c -o bin/test-shmem
+
+test-socket: test-socket.c
+	gcc -ansi -Wall -pedantic test-socket.c -o bin/test-socket
+

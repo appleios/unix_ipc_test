@@ -12,7 +12,7 @@
 #include <time.h>
 
 #define LISTEN_BACKLOG 10
-#define xDEBUG
+#define DEBUG
 
 typedef enum {
 	TCP,
@@ -31,9 +31,10 @@ int main(int argc, char *argv[])
 	char *file=".sock", *ipstring="127.0.0.1", *portstring="4545";
 	int ipstring_len;
 	struct sockaddr_un my_addr, peer_addr;
-	struct sockaddr_in sock_addr;
+	struct sockaddr_in sock_addr, sock_addr_recv;
 	socklen_t peer_addr_size;
 	struct in_addr buf_inet;
+	unsigned recv_sz;
 	
 	if(argc<2 || argc>3){
 		printf("Usage: %s [-t IP:PORT] [-u IP:PORT] [-n FILE]\n"
@@ -77,10 +78,6 @@ int main(int argc, char *argv[])
 			}
 		}
 		
-#ifdef DEBUG
-		printf("IP: %s\nPORT: %s\n",ipstring,portstring);
-#endif
-
 		t = inet_pton(AF_INET, ipstring, &buf_inet); /* or just inet_addr(ipstring) */
 		if (t <= 0) {
 			if (t == 0){
@@ -92,9 +89,6 @@ int main(int argc, char *argv[])
 		}
 		port = atoi(portstring);
 		
-#ifdef DEBUG
-		printf("IP: %u\nPORT: %d\n",ip,port);
-#endif
 		
 	}else if(argv[1][0]=='-' && argv[1][1]=='n' && argv[1][2]==0){ /* native */
 		op = NATIVE;
@@ -138,36 +132,33 @@ int main(int argc, char *argv[])
 			sock_addr.sin_addr.s_addr = ip;
 			sock_addr.sin_port = htons(port);
 			
-			if( bind(sockid, (struct sockaddr *) &sock_addr, sizeof(struct sockaddr_in)) < 0){
+			if( bind(sockid, (struct sockaddr *)&sock_addr, sizeof(struct sockaddr_in)) < 0){
 				close(sockid);
 				fprintf(stderr,"Error: faild to bind socket. Details: %s.\n",strerror(errno));
 				return 31;
 			}
 			
-			if (listen(sockid, LISTEN_BACKLOG) == -1){
-				close(sockid);
-				fprintf(stderr,"Error: faild to listen socket port %d.\n",port);
-				return 32;
+			if (op == TCP) {
+				if (listen(sockid, LISTEN_BACKLOG) == -1){
+					close(sockid);
+					fprintf(stderr,"Error: faild to listen socket port %d.\n",port);
+					return 32;
+				}
+				
+				if( (cfd = accept(sockid, NULL, NULL)) < 0){
+					close(sockid);
+					fprintf(stderr,"Error: faild to accept connection.\n");
+					return 33;
+				}
+				
+				send(cfd,&secret,sizeof(secret),0);
+			}else{
+				printf("sendto %d\n",sockid);
+				if(sendto(sockid,&secret,sizeof(secret),0,
+					   (struct sockaddr*)&sock_addr,sizeof(struct sockaddr_in)) <0 ){
+					printf("sendto failed\n");
+				}
 			}
-			
-#ifdef DEBUG
-			printf("Server is listening to socket.\n");
-#endif
-			
-			if( (cfd = accept(sockid, NULL, NULL)) < 0){
-				close(sockid);
-				fprintf(stderr,"Error: faild to accept connection.\n");
-				return 33;
-			}
-			
-#ifdef DEBUG
-			printf("Server is writing to socket\n");
-#endif
-			write(cfd,&secret,sizeof(secret));
-			
-#ifdef DEBUG
-			printf("Server finished\n");
-#endif
 			
 		}else if(op == NATIVE){
 			if (bind(sockid, (struct sockaddr *) &my_addr,sizeof(struct sockaddr_un)) == -1){
@@ -207,12 +198,27 @@ int main(int argc, char *argv[])
 			sock_addr.sin_family = AF_INET;
 			sock_addr.sin_addr.s_addr = ip;
 			sock_addr.sin_port = htons(port);
-
-			t = connect(sockid,(struct sockaddr *) &sock_addr,sizeof(struct sockaddr_in));
-			if (t<0) {
-				close(sockid);
-				fprintf(stderr,"Errod: faild to establish connection. Details: %s.\n",strerror(errno));
-				return 43;
+			
+			if (op == TCP) {
+				t = connect(sockid,(struct sockaddr *) &sock_addr,sizeof(struct sockaddr_in));
+				if (t<0) {
+					close(sockid);
+					fprintf(stderr,"Errod: faild to establish connection. Details: %s.\n",strerror(errno));
+					return 43;
+				}
+				recv(sockid,&secret,sizeof(secret),0);
+			}else{
+				
+				recv_sz = (int) sizeof(struct sockaddr_in);
+				
+				recvfrom(sockid,&secret,sizeof(secret),0,
+						 (struct sockaddr *) &sock_addr,&recv_sz);
+				
+				if (recv_sz == 0) {
+					printf("!");
+				}else if(recv_sz == -1){
+					printf("**");
+				}
 			}
 		}else{
 			t = connect(sockid,(struct sockaddr *) &my_addr,sizeof(struct sockaddr_un));
@@ -221,18 +227,10 @@ int main(int argc, char *argv[])
 				fprintf(stderr,"Errod: faild to establish connection. Details: %s.\n",strerror(errno));
 				return 43;
 			}
+			read(sockid,&secret,sizeof(secret));
 		}
 
-#ifdef DEBUG
-		printf("Child is connected. Sockfd %d\n",sockid);
-#endif
-
-		read(sockid,&secret,sizeof(secret));
 		fprintf(stdout,"child:  secret=%8d\n",secret);
-		
-#ifdef DEBUG
-		printf("Child finished\n");
-#endif
 	}
 	return 0;
 }
