@@ -12,7 +12,6 @@ int main(int argc, char *argv[])
 {
 	int fd;
 	int secret;
-	struct stat st;
 	char *FIFO_NAME;
 	
 	if(argc != 2){
@@ -22,19 +21,7 @@ int main(int argc, char *argv[])
 	
 	FIFO_NAME = argv[1];
 	
-	if( stat(FIFO_NAME,&st) == -1 && errno == ENOENT ){ /* no such file */
-		if( mkfifo(FIFO_NAME,0644) == 0 && stat(FIFO_NAME,&st) == 0 ){
-			if((st.st_mode & S_IFIFO) == S_IFIFO){
-				fprintf(stderr,"Error: mkfifo created not a fifo\n");
-				return 11;
-			}
-		}
-	}else{
-		if(st.st_mode != S_IFIFO){
-			fprintf(stderr,"Error: file exists and is not a fifo\n");
-			return 10;
-		}
-	}
+	mkfifo(FIFO_NAME,0644);
 	
 	srand(time(0));
 	secret = rand();
